@@ -241,7 +241,7 @@ def iter_rows(conn, dataset, table, orderby, bufsize=100, **filter):
             yield row
 
 
-def find_trial_by_identifiers(conn, identifiers, ignore_record_id=None):
+def find_trial_by_identifiers(conn, identifiers, trial_scientific_title, trial_brief_summary, ignore_record_id=None):
     """Find first trial matched by one of passed identifiers.
 
     Args:
@@ -268,6 +268,16 @@ def find_trial_by_identifiers(conn, identifiers, ignore_record_id=None):
                 break
         if trial:
             break
+    if trial:
+        logger.debug('Trial-id %s was matched via identifiers',
+                     trial['id'])
+    elif trial_brief_summary and trial_scientific_title:
+        trial = conn['database']['trials'].find_one(
+                            scientific_title=trial_scientific_title,
+                            trial_brief_summary=trial_brief_summary)
+        if trial:
+            logger.debug('Trial-id %s was matched via scientific title and summary',
+                         trial['id'])
     return trial
 
 

@@ -32,9 +32,10 @@ def write_trial(conn, trial, source_id, record_id):
 
     # Get trial object (first try to ignore source record for better dedup)
     object = helpers.find_trial_by_identifiers(conn, trial['identifiers'],
-        ignore_record_id=record_id)
+        trial['scientific_title'], trial['brief_summary'], ignore_record_id=record_id)
     if not object:
-        object = helpers.find_trial_by_identifiers(conn, trial['identifiers'])
+        object = helpers.find_trial_by_identifiers(conn, trial['identifiers'],
+                trial['scientific_title'], trial['brief_summary'])
 
     # Create object
     if not object:
