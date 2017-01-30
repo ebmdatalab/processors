@@ -241,43 +241,58 @@ def iter_rows(conn, dataset, table, orderby, bufsize=100, **filter):
             yield row
 
 
-def find_trial_by_identifiers(conn, identifiers, trial_scientific_title, trial_brief_summary, ignore_record_id=None):
-    """Find first trial matched by one of passed identifiers.
-
+def find_trial_by_identifiers(conn, identifiers, trial_scientific_title, trial_brief_summary, record_id):
+    """Find first trial matched by one of passed identifiers or by its scientific_title and brief_summary.
     Args:
         conn (dict): connection dict
         identifiers (dict): identifiers dict (nct: <id>, euct: <id>, ...)
-        ignore_record_id (str): skip record with this id (for better dedup)
-
+        trial_scientific_title (str): trial's scientific title
+        trial_brief_summary (str): trial's brief summary
+        record_id (str): record id from warehouse
     Returns:
         dict: trial
-
     """
+
+    def get_trial(records, ignore_record_id=None):
+        """Finds a trial ignoring its record id. If no trial is found, tries to find using record id.
+        Args:
+            records (list): list of records
+            ignore_record_id (str): skip record with this id (for better dedup)
+        Returns:
+            dict: trial
+        """
+        trial = None
+        for record in records:
+            if ignore_record_id and record['id'].hex == uuid.UUID(ignore_record_id).hex:
+                continue
+            trial = conn['database']['trials'].find_one(
+                id=record['trial_id'].hex)
+            if trial:
+                break
+        return trial
+
     trial = None
     # See https://github.com/opentrials/processors/pull/46/files/f5e8403072bf6ed93b82d0c45bd3877e42e435c4#r76836368
     QUERY = "SELECT * FROM records WHERE identifiers @> '%s'"
     for source, identifier in identifiers.items():
         query = QUERY % json.dumps({source: identifier})
         records = list(conn['database'].query(query))
-        for record in records:
-            if (ignore_record_id and record['id'].hex == uuid.UUID(ignore_record_id).hex):
-                continue
-            trial = conn['database']['trials'].find_one(
-                id=record['trial_id'].hex)
-            if trial:
-                break
+        trial = get_trial(records, record_id)
+        if not trial:
+            trial = get_trial(records)
         if trial:
             break
+
     if trial:
-        logger.debug('Trial-id %s was matched via identifiers',
-                     trial['id'])
+        logger.debug('Trial-id %s was matched via identifiers with register-id %s',
+                     trial['id'], record_id)
     elif trial_brief_summary and trial_scientific_title:
         trial = conn['database']['trials'].find_one(
                             scientific_title=trial_scientific_title,
                             trial_brief_summary=trial_brief_summary)
         if trial:
-            logger.debug('Trial-id %s was matched via scientific title and summary',
-                         trial['id'])
+            logger.debug('Trial-id %s was matched via scientific title and summary with register-id %s',
+                         trial['id'], record_id)
     return trial
 
 
