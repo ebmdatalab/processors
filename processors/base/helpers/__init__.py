@@ -288,8 +288,7 @@ def find_trial_by_identifiers(conn, identifiers, trial_scientific_title, trial_b
                      trial['id'], record_id)
     elif trial_brief_summary and trial_scientific_title:
         trial = conn['database']['trials'].find_one(
-                            scientific_title=trial_scientific_title,
-                            trial_brief_summary=trial_brief_summary)
+                            scientific_title=trial_scientific_title)
         if trial:
             logger.debug('Trial-id %s was matched via scientific title and summary with register-id %s',
                          trial['id'], record_id)
