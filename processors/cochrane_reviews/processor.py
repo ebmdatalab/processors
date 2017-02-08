@@ -108,7 +108,7 @@ def match_by_nct_id(conn, nct_id):
 
     query_criteria = {'nct': 'NCT' + nct_id}
     trial = base.helpers.find_trial_by_identifiers(conn, query_criteria,
-                        trial_scientific_title=None, trial_brief_summary=None, record_id=None)
+                        trial_public_title=None, source_id=None, record_id=None)
     if trial:
         return [trial['id']]
     else:

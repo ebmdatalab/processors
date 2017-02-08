@@ -241,17 +241,21 @@ def iter_rows(conn, dataset, table, orderby, bufsize=100, **filter):
             yield row
 
 
-def find_trial_by_identifiers(conn, identifiers, trial_scientific_title, trial_brief_summary, record_id):
-    """Find first trial matched by one of passed identifiers or by its scientific_title and brief_summary.
+def find_trial_by_identifiers(conn, identifiers, trial_public_title, source_id, record_id):
+    """Find if the trial already exists. Firstly, via identifiers. Secondly, via public title
     Args:
         conn (dict): connection dict
         identifiers (dict): identifiers dict (nct: <id>, euct: <id>, ...)
-        trial_scientific_title (str): trial's scientific title
-        trial_brief_summary (str): trial's brief summary
+        trial_public_title (str): trial's scientific title
+        source_id (str): trial's source id
         record_id (str): record id from warehouse
     Returns:
         dict: trial
     """
+
+    def write_log(path, text):
+        with open(path, "a") as logFile:
+            logFile.write(text + "\n")
 
     def get_trial(records, ignore_record_id=None):
         """Finds a trial ignoring its record id. If no trial is found, tries to find using record id.
@@ -286,12 +290,17 @@ def find_trial_by_identifiers(conn, identifiers, trial_scientific_title, trial_b
     if trial:
         logger.debug('Trial-id %s was matched via identifiers with register-id %s',
                      trial['id'], record_id)
-    elif trial_brief_summary and trial_scientific_title:
-        trial = conn['database']['trials'].find_one(
-                            scientific_title=trial_scientific_title)
-        if trial:
-            logger.debug('Trial-id %s was matched via scientific title and summary with register-id %s',
+        temp = 'Trial-id %s was matched via identifiers with register-id %s' % (trial['id'], record_id)
+        write_log("/local/log.txt", temp)
+    elif source_id and trial_public_title:
+        trial_temp = conn['database']['trials'].find_one(
+                            public_title=trial_public_title)
+        if trial and trial.get('source-id') != source_id:
+            logger.debug('Trial-id %s was matched via public title with register-id %s',
                          trial['id'], record_id)
+            temp = 'Trial-id %s was matched via public title with register-id %s' % (trial['id'], record_id)
+            write_log("/local/log.txt", temp)
+            trial = trial_temp
     return trial
 
 

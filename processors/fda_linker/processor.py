@@ -33,8 +33,8 @@ def process(conf, conn):
 
                 # Get trial
                 trial = base.helpers.find_trial_by_identifiers(
-                    conn, identifiers=identifiers, trial_scientific_title=None,
-                    trial_brief_summary=None, record_id=None)
+                    conn, identifiers=identifiers, trial_public_title=None,
+                    source_id=None, record_id=None)
 
                 if trial:
                     base.writers.write_trial_relationship(
