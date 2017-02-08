@@ -31,7 +31,7 @@ def write_trial(conn, trial, source_id, record_id):
     timestamp = datetime.datetime.utcnow()
 
     object = helpers.find_trial_by_identifiers(conn, trial['identifiers'],
-                 trial['scientific_title'], trial['brief_summary'], record_id)
+                 trial.get('scientific_title'), trial.get('brief_summary'), record_id)
 
     # Create object
     if not object:
