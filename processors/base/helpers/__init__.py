@@ -253,10 +253,6 @@ def find_trial_by_identifiers(conn, identifiers, trial_public_title, source_id, 
         dict: trial
     """
 
-    def write_log(path, text):
-        with open(path, "a") as logFile:
-            logFile.write(text + "\n")
-
     def get_trial(records, ignore_record_id=None):
         """Finds a trial ignoring its record id. If no trial is found, tries to find using record id.
         Args:
@@ -290,16 +286,12 @@ def find_trial_by_identifiers(conn, identifiers, trial_public_title, source_id, 
     if trial:
         logger.debug('Trial-id %s was matched via identifiers with register-id %s',
                      trial['id'], record_id)
-        temp = 'Trial-id %s was matched via identifiers with register-id %s' % (trial['id'], record_id)
-        write_log("/local/log.txt", temp)
     elif source_id and trial_public_title:
         trial_temp = conn['database']['trials'].find_one(
                             public_title=trial_public_title)
         if trial and trial.get('source-id') != source_id:
             logger.debug('Trial-id %s was matched via public title with register-id %s',
                          trial['id'], record_id)
-            temp = 'Trial-id %s was matched via public title with register-id %s' % (trial['id'], record_id)
-            write_log("/local/log.txt", temp)
             trial = trial_temp
     return trial
 
