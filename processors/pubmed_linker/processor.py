@@ -59,4 +59,3 @@ def process(conf, conn):
         count += 1
         if not count % 100:
             logger.info('Processed for links %s pubmed publications', count)
-
