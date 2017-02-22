@@ -31,8 +31,7 @@ def process(conf, conn):
 
             # Get trial
             trial = base.helpers.find_trial_by_identifiers(
-                    conn, identifiers=identifiers, trial_public_title=None,
-                    source_id=None, record_id=None)
+                    conn, identifiers=identifiers)
 
             # Found trial - add relationship
             if trial:

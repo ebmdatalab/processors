@@ -241,59 +241,62 @@ def iter_rows(conn, dataset, table, orderby, bufsize=100, **filter):
             yield row
 
 
-def find_trial_by_identifiers(conn, identifiers, trial_public_title, source_id, record_id):
-    """Find if the trial already exists. Firstly, via identifiers. Secondly, via public title
+def find_trial_by_identifiers(conn, identifiers, ignore_record_id=None):
+    """Find first trial matched by one of passed identifiers.
+
     Args:
         conn (dict): connection dict
         identifiers (dict): identifiers dict (nct: <id>, euct: <id>, ...)
-        trial_public_title (str): trial's scientific title
-        source_id (str): trial's source id
-        record_id (str): record id from warehouse
+        ignore_record_id (str): skip record with this id (for better dedup)
     Returns:
         dict: trial
     """
-
-    def get_trial(records, ignore_record_id=None):
-        """Finds a trial ignoring its record id. If no trial is found, tries to find using record id.
-        Args:
-            records (list): list of records
-            ignore_record_id (str): skip record with this id (for better dedup)
-        Returns:
-            dict: trial
-        """
-        trial = None
-        for record in records:
-            if ignore_record_id and record['id'].hex == uuid.UUID(ignore_record_id).hex:
-                continue
-            trial = conn['database']['trials'].find_one(
-                id=record['trial_id'].hex)
-            if trial:
-                break
-        return trial
-
     trial = None
     # See https://github.com/opentrials/processors/pull/46/files/f5e8403072bf6ed93b82d0c45bd3877e42e435c4#r76836368
     QUERY = "SELECT * FROM records WHERE identifiers @> '%s'"
     for source, identifier in identifiers.items():
         query = QUERY % json.dumps({source: identifier})
         records = list(conn['database'].query(query))
-        trial = get_trial(records, record_id)
-        if not trial:
-            trial = get_trial(records)
+        for record in records:
+            if (ignore_record_id and record['id'].hex == uuid.UUID(ignore_record_id).hex):
+                continue
+            trial = conn['database']['trials'].find_one(
+                id=record['trial_id'].hex)
+            if trial:
+                break
         if trial:
             break
-
-    if trial:
-        logger.debug('Trial-id %s was matched via identifiers with register-id %s',
-                     trial['id'], record_id)
-    elif source_id and trial_public_title:
-        trial_temp = conn['database']['trials'].find_one(
-                            public_title=trial_public_title)
-        if trial and trial.get('source-id') != source_id:
-            logger.debug('Trial-id %s was matched via public title with register-id %s',
-                         trial['id'], record_id)
-            trial = trial_temp
     return trial
+
+
+def find_trial(conn, trial, source_id, record_id=None):
+    """Find if the trial already exists. Firstly, via identifiers. Secondly, via public title
+    Args:
+        conn (dict): connection dict
+        trial (dict): trial that may be found
+        source_id (text): trial's source
+        record_id (str): record id from warehouse
+    Returns:
+        dict: trial
+    """
+
+    trial_found = find_trial_by_identifiers(conn, trial['identifiers'],
+                                            ignore_record_id=record_id)
+
+    if not trial_found:
+        trial_found = find_trial_by_identifiers(conn, trial['identifiers'])
+
+    if trial_found:
+        logger.debug('Trial-id %s was matched via identifiers with register-id %s',
+                     trial_found['id'], record_id)
+    elif source_id and trial.get('trial_public_title'):
+        trial_temp = conn['database']['trials'].find_one(
+                            public_title=trial.get('trial_public_title'))
+        if trial_temp and trial_temp.get('source_id') != source_id:
+            logger.debug('Trial-id %s was matched via public title with register-id %s',
+                         trial_found['id'], record_id)
+            trial_found = trial_temp
+    return trial_found
 
 
 def safe_prepend(prepend_string, string):

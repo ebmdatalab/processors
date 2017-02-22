@@ -30,8 +30,7 @@ def write_trial(conn, trial, source_id, record_id):
     create = False
     timestamp = datetime.datetime.utcnow()
 
-    object = helpers.find_trial_by_identifiers(conn, trial['identifiers'],
-                 trial.get('public_title'), source_id, record_id)
+    object = helpers.find_trial(conn, trial, source_id, record_id)
 
     # Create object
     if not object:
