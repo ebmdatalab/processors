@@ -16,6 +16,7 @@ import csv
 import fuzzywuzzy.fuzz
 import fuzzywuzzy.process
 import iso3166
+import git
 
 from . import pybossa_tasks_updater
 
@@ -280,6 +281,22 @@ def find_trial(conn, trial, source_id, record_id=None):
         dict: trial
     """
 
+    def write_log(trial_id, record_id, method):
+        log = conn['database']['trial_deduplication_logs'].find_one(
+            trial_id=trial_id, record_id=record_id, method=method)
+
+        if not log:
+            repo = git.Repo(search_parent_directories=True)
+            commit_sha = repo.head.object.hexsha
+
+            data = {
+                'trial_id': trial_id,
+                'record_id': record_id,
+                'method': method,
+                'commit': commit_sha
+            }
+            conn['database']['trial_deduplication_logs'].insert(data)
+
     trial_found = find_trial_by_identifiers(conn, trial['identifiers'],
                                             ignore_record_id=record_id)
 
@@ -289,12 +306,14 @@ def find_trial(conn, trial, source_id, record_id=None):
     if trial_found:
         logger.debug('Trial-id %s was matched via identifiers with register-id %s',
                      trial_found['id'], record_id)
+        write_log(trial_found['id'], record_id, 'identifier')
     elif source_id and trial.get('trial_public_title'):
         trial_temp = conn['database']['trials'].find_one(
                             public_title=trial.get('trial_public_title'))
         if trial_temp and trial_temp.get('source_id') != source_id:
             logger.debug('Trial-id %s was matched via public title with register-id %s',
                          trial_found['id'], record_id)
+            write_log(trial_found['id'], record_id, 'title')
             trial_found = trial_temp
     return trial_found
 
