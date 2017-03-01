@@ -26,19 +26,28 @@ def process_publications(conn, table, extractors):
     # Extract and write source
     source = extractors['extract_source'](None)
     source_id = writers.write_source(conn, source)
-
     success = 0
     for record in helpers.iter_rows(conn, 'warehouse', table, orderby='meta_id'):
-
         conn['database'].begin()
-
         try:
 
             # Extract and write publications
-            publications = extractors['extract_publications'](record)
-            for publication in publications:
-                writers.write_publication(conn, publication, source_id)
+            publication = extractors['extract_publication'](record)
+            publication_id = writers.write_publication(conn, publication, source_id)
 
+            # Delete existent relationships
+            conn['database']['trials_publications'].delete(publication_id=publication_id)
+
+            # Create new relationships
+            for identifiers in publication.get('identifiers'):
+                trial = helpers.find_trial_by_identifiers(conn, identifiers=identifiers)
+                if trial:
+                    writers.write_trial_relationship(
+                        conn, 'publication', publication, publication_id, trial['id']
+                    )
+                    logger.debug('Linked %s to "%s"',
+                        trial['identifiers'].values(), publication['title'][0:50]
+                    )
         except Exception:
             config.SENTRY.captureException()
             conn['database'].rollback()
@@ -46,5 +55,4 @@ def process_publications(conn, table, extractors):
             success += 1
             conn['database'].commit()
             if not success % 100:
-                logger.info('Processed %s publications from %s',
-                    success, table)
+                logger.info('Processed %s publications from %s', success, table)
