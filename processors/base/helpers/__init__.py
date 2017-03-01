@@ -308,9 +308,17 @@ def find_trial(conn, trial, source_id, record_id=None):
                      trial_found['id'], record_id)
         write_log(trial_found['id'], record_id, 'identifier')
     elif source_id and trial.get('trial_public_title'):
-        trial_temp = conn['database']['trials'].find_one(
-                            public_title=trial.get('trial_public_title'))
-        if trial_temp and trial_temp.get('source_id') != source_id:
+        query = "SELECT * FROM trials " \
+                "WHERE public_title = :public_title " \
+                "AND source_id != :source_id " \
+                "LIMIT 1"
+
+        trial_temp = conn['database']['trials'].query(
+            query,
+            public_title=trial.get('trial_public_title'),
+            source_id=source_id
+        )
+        if trial_temp:
             logger.debug('Trial-id %s was matched via public title with register-id %s',
                          trial_found['id'], record_id)
             write_log(trial_found['id'], record_id, 'title')
