@@ -5,13 +5,12 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import logging
+from sqlalchemy import exc as sqlalchemy_exceptions
 from .. import config
 from .. import helpers
 from .. import writers
 logger = logging.getLogger(__name__)
 
-
-# Module API
 
 def process_publications(conn, table, extractors):
     """Translate publication records from warehouse to database.
@@ -48,9 +47,14 @@ def process_publications(conn, table, extractors):
                     logger.debug('Linked %s to "%s"',
                         trial['identifiers'].values(), publication['title'][0:50]
                     )
-        except Exception:
-            config.SENTRY.captureException()
+        except sqlalchemy_exceptions.DBAPIError:
             conn['database'].rollback()
+            config.SENTRY.captureException(extra={
+                'record_id': record['meta_id'],
+            })
+            logger.debug('Couldn\'t process publication from record: %s',
+                record['meta_id']
+            )
         else:
             success += 1
             conn['database'].commit()

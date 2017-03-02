@@ -45,7 +45,7 @@ def write_trial(conn, trial, source_id, record_id):
 
     # Decide primary
     is_primary = False
-    priority = ['nct', 'euctr', 'isrctn']
+    priority = ['nct', 'euctr', 'isrctn', 'pubmed']
     for register in priority:
         if create:
             is_primary = True
