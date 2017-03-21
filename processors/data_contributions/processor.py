@@ -36,9 +36,6 @@ def process(conf, conn):
         AND (data_url IS NOT NULL OR url IS NOT NULL)
     '''
     for contribution in conn['explorer'].query(for_processing):
-        base.config.SENTRY.extra_context({
-            'data_contribution': contribution,
-        })
         contribution = convert_ids(contribution)
         trial = conn['database']['trials'].find_one(id=contribution['trial_id'])
         if trial:
@@ -54,9 +51,6 @@ def process(conf, conn):
         AND document_id IS NOT NULL
     '''
     for contribution in conn['explorer'].query(for_removal):
-        base.config.SENTRY.extra_context({
-            'data_contribution': contribution,
-        })
         contribution = convert_ids(contribution)
         _remove_document(conn, contribution)
 
@@ -91,7 +85,9 @@ def _process_document(conn, contribution, extractors, source_id):
         except sqlalchemy_exceptions.DBAPIError:
             conn['database'].rollback()
             logger.debug('Could not process data contribution: %s', contribution['id'])
-            raise
+            base.config.SENTRY.captureException(extra={
+                'data_contribution': contribution,
+            })
         else:
             conn['database'].commit()
             logger.info('Sucessfully processed data contribution: %s', contribution['id'])
@@ -109,7 +105,9 @@ def _remove_document(conn, contribution):
     except sqlalchemy_exceptions.DBAPIError:
         conn['database'].rollback()
         logger.debug('Could not remove contributed document: %s', document_id)
-        raise
+        base.config.SENTRY.captureException(extra={
+            'data_contribution': contribution,
+        })
     else:
         conn['database'].commit()
         logger.info('Sucessfully removed contributed document: %s', document_id)
