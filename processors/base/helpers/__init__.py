@@ -16,6 +16,7 @@ import csv
 import fuzzywuzzy.fuzz
 import fuzzywuzzy.process
 import iso3166
+import git
 
 from . import pybossa_tasks_updater
 
@@ -248,10 +249,8 @@ def find_trial_by_identifiers(conn, identifiers, ignore_record_id=None):
         conn (dict): connection dict
         identifiers (dict): identifiers dict (nct: <id>, euct: <id>, ...)
         ignore_record_id (str): skip record with this id (for better dedup)
-
     Returns:
         dict: trial
-
     """
     trial = None
     # See https://github.com/opentrials/processors/pull/46/files/f5e8403072bf6ed93b82d0c45bd3877e42e435c4#r76836368
@@ -269,6 +268,62 @@ def find_trial_by_identifiers(conn, identifiers, ignore_record_id=None):
         if trial:
             break
     return trial
+
+
+def find_trial(conn, trial, source_id, record_id=None):
+    """Find if the trial already exists. Firstly, via identifiers. Secondly, via public title
+    Args:
+        conn (dict): connection dict
+        trial (dict): trial that may be found
+        source_id (text): trial's source
+        record_id (str): record id from warehouse
+    Returns:
+        dict: trial
+    """
+
+    def write_log(trial_id, record_id, method):
+        log = conn['database']['trial_deduplication_logs'].find_one(
+            trial_id=trial_id, record_id=record_id, method=method)
+
+        if not log:
+            repo = git.Repo(search_parent_directories=True)
+            commit_sha = repo.head.object.hexsha
+
+            data = {
+                'trial_id': trial_id,
+                'record_id': record_id,
+                'method': method,
+                'commit': commit_sha
+            }
+            conn['database']['trial_deduplication_logs'].insert(data)
+
+    trial_found = find_trial_by_identifiers(conn, trial['identifiers'],
+                                            ignore_record_id=record_id)
+
+    if not trial_found:
+        trial_found = find_trial_by_identifiers(conn, trial['identifiers'])
+
+    if trial_found:
+        logger.debug('Trial-id %s was matched via identifiers with register-id %s',
+                     trial_found['id'], record_id)
+        write_log(trial_found['id'], record_id, 'identifier')
+    elif source_id and trial.get('trial_public_title'):
+        query = "SELECT * FROM trials " \
+                "WHERE public_title = :public_title " \
+                "AND source_id != :source_id " \
+                "LIMIT 1"
+
+        trial_temp = conn['database']['trials'].query(
+            query,
+            public_title=trial.get('trial_public_title'),
+            source_id=source_id
+        )
+        if trial_temp:
+            logger.debug('Trial-id %s was matched via public title with register-id %s',
+                         trial_found['id'], record_id)
+            write_log(trial_found['id'], record_id, 'title')
+            trial_found = trial_temp
+    return trial_found
 
 
 def safe_prepend(prepend_string, string):
