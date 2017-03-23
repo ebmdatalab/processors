@@ -9,7 +9,7 @@ import collections
 import processors.hra.extractors as extractors
 
 
-class TestExtractPublication(object):
+class TestHRAPublicationExtractor(object):
     def test_extracts_publication_identifiers(self):
         record = collections.defaultdict(lambda: '')
         record.update({

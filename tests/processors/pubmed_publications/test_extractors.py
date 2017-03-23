@@ -6,10 +6,10 @@ from __future__ import unicode_literals
 
 
 import collections
-import processors.pubmed.extractors as extractors
+import processors.pubmed_publications.extractors as extractors
 
 
-class TestExtractPublication(object):
+class TestPubmedPublicationExtractor(object):
     def test_extracts_registry_identifiers(self):
         record = collections.defaultdict(lambda: '')
         record['registry_ids'] = [{"ClinicalTrials.gov": "NCT01572025"}]

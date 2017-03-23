@@ -9,6 +9,7 @@ import logging
 from sqlalchemy import exc as sqlalchemy_exceptions
 from .. import base
 from . import extractors as extractors_module
+from ..pubmed_publications import extractors as related_extractors_module
 logger = logging.getLogger(__name__)
 
 
@@ -16,18 +17,14 @@ def process(conf, conn):
     extractors = base.helpers.get_variables(
         extractors_module, lambda x: x.startswith('extract_')
     )
-    table_name = 'pubmed'
-
-    _process_unregistered_trials(conn, table_name, extractors)
-    base.processors.process_publications(conn, table_name, extractors)
-
-
-def _process_unregistered_trials(conn, table_name, extractors):
-    source = extractors['extract_source'](None)
+    related_extractors = base.helpers.get_variables(
+        related_extractors_module, lambda x: x.startswith('extract_')
+    )
+    source = related_extractors['extract_source'](None)
     source_id = base.writers.write_source(conn, source)
 
-    for record in base.helpers.iter_rows(conn, 'warehouse', table_name, orderby='meta_id'):
-        publication = extractors['extract_publication'](record)
+    for record in base.helpers.iter_rows(conn, 'warehouse', 'pubmed', orderby='meta_id'):
+        publication = related_extractors['extract_publication'](record)
         unregistered_trial = extractors['extract_trial'](record)
         conn['database'].begin()
         try:
@@ -64,9 +61,9 @@ def _process_unregistered_trials(conn, table_name, extractors):
         except sqlalchemy_exceptions.DBAPIError:
             conn['database'].rollback()
             base.config.SENTRY.captureException(extra={
-                'record_id': record['meta_id'],
+                'record': record,
             })
-            logger.debug('Couldn\'t process unregistered trial from record: %s',
+            logger.debug('Couldn\'t process unregistered trial from PubMed record: %s',
                 record['meta_id']
             )
         else:

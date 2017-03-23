@@ -6,11 +6,11 @@ from __future__ import unicode_literals
 
 import pytest
 import processors.base.helpers as helpers
-import processors.pubmed.processor as processor
-import processors.pubmed.extractors as extractors_module
+import processors.pubmed_unregistered_trials.processor as processor
+import processors.pubmed_unregistered_trials.extractors as extractors_module
 
 
-class TestProcessUnregisteredTrials(object):
+class TestPubmedUnregisteredTrialsProcessor(object):
     def test_creates_unregistred_trial_if_no_registry_ids(self, conn, pubmed_record):
         pubmed_attrs = conn['warehouse']['pubmed'].find_one(pmid=pubmed_record)
         pubmed_attrs['registry_ids'] = None
@@ -37,10 +37,34 @@ class TestProcessUnregisteredTrials(object):
         conn['database']['records'].update(record_attrs, ['id'])
         processor.process({}, conn)
 
-        doc = conn['database']['documents'].find_one(
+        document = conn['database']['documents'].find_one(
             source_url=pubmed_attrs['meta_source']
         )
-        assert doc is not None
+        assert document is not None
+
+
+    def test_links_results_document_to_found_trial(self, conn,
+        pubmed_record, record, trial, results_document_category):
+
+        pubmed_attrs = conn['warehouse']['pubmed'].find_one(pmid=pubmed_record)
+        record_attrs = conn['database']['records'].find_one(id=record)
+        identifiers = {'isrctn': 'ISRCTN31181395'}
+        pubmed_attrs['registry_ids'] = [identifiers]
+        record_attrs.update({
+            'identifiers': identifiers,
+            'trial_id': trial,
+        })
+        conn['warehouse']['pubmed'].update(pubmed_attrs, ['pmid'])
+        conn['database']['records'].update(record_attrs, ['id'])
+        processor.process({}, conn)
+
+        document = conn['database']['documents'].find_one(
+            source_url=pubmed_attrs['meta_source']
+        )
+        trial_document = conn['database']['trials_documents'].find_one(
+            trial_id=trial, document_id=document['id']
+        )
+        assert trial_document is not None
 
 
     def test_doesnt_create_document_if_trial_not_found_from_registry_ids(self, conn,
@@ -51,10 +75,10 @@ class TestProcessUnregisteredTrials(object):
         conn['warehouse']['pubmed'].update(pubmed_attrs, ['pmid'])
         processor.process({}, conn)
 
-        doc = conn['database']['documents'].find_one(
+        document = conn['database']['documents'].find_one(
             source_url=pubmed_attrs['meta_source']
         )
-        assert doc is None
+        assert document is None
 
 
     def test_deletes_unregistered_trial_record_if_registry_ids_added(self, conn,

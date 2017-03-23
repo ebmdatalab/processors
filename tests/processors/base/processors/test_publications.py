@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 
 import pytest
 from processors.base import helpers
-import processors.pubmed.extractors as extractors_module
+import processors.pubmed_publications.extractors as extractors_module
 from processors.base.processors.publication import process_publications
 
 
